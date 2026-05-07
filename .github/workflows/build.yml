@@ -51,9 +51,6 @@ jobs:
           export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      - name: Initialize Capacitor
-        run: npx cap init "AI记账本" "com.aiaccountbook.app" --web-dir=dist
-
       - name: Add Android platform
         run: npx cap add android
 
@@ -74,9 +71,3 @@ jobs:
           name: AIAccountBook-APK
           path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 7
-
-      - name: Display APK Info
-        run: |
-          echo "=== APK Build Complete ==="
-          echo "APK Location: android/app/build/outputs/apk/debug/"
-          ls -lh android/app/build/outputs/apk/debug/*.apk 2>/dev/null || echo "APK not found, check build logs"
