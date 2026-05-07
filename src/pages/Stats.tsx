@@ -25,7 +25,7 @@ function getCategoryStats(records: RecordData[]): Record<string, number> {
 
 export function Stats() {
   const { records } = useRecords();
-  const [period] = useState<'week' | 'month'>('month');
+  const [period, setPeriod] = useState<'week' | 'month'>('month');
 
   const monthTotal = useMemo(() => getMonthTotal(records), [records]);
   const categoryStats = useMemo(() => getCategoryStats(records), [records]);
@@ -45,6 +45,7 @@ export function Stats() {
             {(['week', 'month'] as const).map(p => (
               <button
                 key={p}
+                onClick={() => setPeriod(p)}
                 style={{
                   flex: 1,
                   padding: '10px',
