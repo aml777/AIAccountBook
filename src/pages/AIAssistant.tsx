@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { parseChineseNumber } from '../utils/formatters';
+import { autoCategorize } from '../utils/categories';
 import { useRecords } from '../hooks/useRecords';
-import { QuickAdd } from '../components/QuickAdd';
 
 interface Message {
   id: string;
@@ -14,12 +14,11 @@ export function AIAssistant() {
     {
       id: '1',
       type: 'ai',
-      content: '你好！我是AI记账助手。你可以：\n• 输入"花了100块买咖啡"\n• 说"中午外卖35元"\n• 问我"本月花了多少钱"\n\n试试语音输入（点🎤按钮）吧！'
+      content: '你好！我是AI记账助手。你可以说：\n• "花了100块买咖啡"\n• "中午外卖35元"\n• 问我"本月花了多少钱"\n\n试试语音输入（点🎤按钮）吧！'
     }
   ]);
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { addRecord, records } = useRecords();
@@ -44,32 +43,43 @@ export function AIAssistant() {
     scrollToBottom();
   }, [messages]);
 
-  const processCommand = (text: string) => {
+  const processCommand = (text: string): { type: 'reply'; content: string } | { type: 'record'; amount: number; description: string; category: string } | null => {
     const lowerText = text.toLowerCase().trim();
 
-    if (lowerText.includes('本月') && (lowerText.includes('多少') || lowerText.includes('花了'))) {
-      return `本月已消费 ¥${monthTotal.toFixed(2)}，加油哦！💪`;
+    // 查询类命令
+    if (lowerText.includes('本月') && (lowerText.includes('多少') || lowerText.includes('花了') || lowerText.includes('共'))) {
+      return { type: 'reply', content: `本月已消费 ¥${monthTotal.toFixed(2)}，加油哦！💪` };
     }
 
     if (lowerText.includes('今天') && (lowerText.includes('多少') || lowerText.includes('花了'))) {
-      return `今天已消费 ¥${todayTotal.toFixed(2)}，继续保持！📊`;
+      return { type: 'reply', content: `今天已消费 ¥${todayTotal.toFixed(2)}，继续保持！📊` };
     }
 
-    if (lowerText.includes('一共') || lowerText.includes('总共')) {
-      return `本月总计消费 ¥${monthTotal.toFixed(2)}，要精打细算哦！💰`;
+    if (lowerText.includes('一共') || lowerText.includes('总共') || lowerText.includes('合计')) {
+      return { type: 'reply', content: `本月总计消费 ¥${monthTotal.toFixed(2)}，要精打细算哦！💰` };
     }
 
-    if (lowerText.includes('记录') && (lowerText.includes('多少') || lowerText.includes('几条'))) {
-      return `共有 ${records.length} 条记账记录，继续保持好习惯！📝`;
+    if ((lowerText.includes('记录') || lowerText.includes('账单')) && (lowerText.includes('多少') || lowerText.includes('几条') || lowerText.includes('共'))) {
+      return { type: 'reply', content: `共有 ${records.length} 条记账记录，继续保持好习惯！📝` };
     }
 
+    // 尝试解析为记账
     const amount = parseChineseNumber(text);
     if (amount && amount > 0) {
-      setShowQuickAdd(true);
-      return null;
+      const category = autoCategorize(text);
+      return { type: 'record', amount, description: text, category };
     }
 
-    return null;
+    return { type: 'reply', content: '我不太明白你的意思，你可以试试说"花了100块买咖啡"来记账哦~ 🤔' };
+  };
+
+  const getCategoryName = (id: string): string => {
+    const map: Record<string, string> = {
+      food: '餐饮', transport: '交通', shopping: '购物', entertainment: '娱乐',
+      health: '医疗', education: '教育', housing: '住房', daily: '日用',
+      beauty: '美容', pet: '宠物', social: '社交', other: '其他'
+    };
+    return map[id] || '其他';
   };
 
   const handleSend = () => {
@@ -80,20 +90,27 @@ export function AIAssistant() {
       type: 'user',
       content: input
     };
-
     setMessages(prev => [...prev, userMessage]);
 
-    setTimeout(() => {
-      const response = processCommand(input);
-      if (response) {
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          type: 'ai',
-          content: response
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      }
-    }, 500);
+    const result = processCommand(input);
+    if (!result) return;
+
+    if (result.type === 'record') {
+      addRecord({ amount: result.amount, description: result.description, category: result.category, date: new Date().toISOString() });
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: `好的！已记录 ¥${result.amount}（${getCategoryName(result.category)}），继续保持！✨`
+      };
+      setTimeout(() => setMessages(prev => [...prev, aiMessage]), 300);
+    } else {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: result.content
+      };
+      setTimeout(() => setMessages(prev => [...prev, aiMessage]), 500);
+    }
 
     setInput('');
   };
@@ -192,20 +209,6 @@ export function AIAssistant() {
           </div>
         </div>
       </div>
-
-      <QuickAdd
-        isOpen={showQuickAdd}
-        onClose={() => setShowQuickAdd(false)}
-        onAdd={(amount, description, category) => {
-          addRecord({ amount, description, category, date: new Date().toISOString() });
-          const aiMessage: Message = {
-            id: Date.now().toString(),
-            type: 'ai',
-            content: `好的！已记录 ¥${amount}，继续保持！✨`
-          };
-          setMessages(prev => [...prev, aiMessage]);
-        }}
-      />
     </>
   );
 }
