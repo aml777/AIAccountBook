@@ -51,15 +51,13 @@ jobs:
           export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
           sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      - name: Add Android platform
-        run: npx cap add android
-
       - name: Sync Web to Android
         run: npx cap sync android
 
       - name: Build Debug APK
         run: |
           export ANDROID_HOME=$HOME/android-sdk
+          export JAVA_HOME=$JAVA_HOME
           export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
           cd android
           chmod +x gradlew
